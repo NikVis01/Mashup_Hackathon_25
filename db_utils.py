@@ -10,32 +10,6 @@ load_dotenv()
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY")
 
-### Main Database Insertion Function ###
-def insert_bull_data(data):
-    conn = psycopg2.connect(
-        host=os.getenv("SUPABASE_DB_HOST"),
-        dbname=os.getenv("SUPABASE_DB_NAME"),
-        user=os.getenv("SUPABASE_DB_USER"),
-        password=os.getenv("SUPABASE_DB_PASSWORD"),
-        port=os.getenv("SUPABASE_DB_PORT", 5432)
-    )
-    cur = conn.cursor()
-
-    cur.execute("""
-        INSERT INTO bulls (bull_name, ntm, yield, data_json)
-        VALUES (%s, %s, %s, %s)
-        """,
-        (
-            data.get("bull_names", [""])[0],  # first bull name
-            data.get("NTM", ""),
-            data.get("yield", ""),
-            json.dumps(data)  # store the whole data as JSON for reference
-        )
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
-
 def upsert_bullz_row(data):
     url = f"{SUPABASE_URL}/rest/v1/Bullz"
     headers = {

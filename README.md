@@ -11,7 +11,6 @@
    OPENAI_API_KEY=your_openai_api_key_here
    SUPABASE_URL=https://yourprojectid.supabase.co
    SUPABASE_ANON_KEY=your_supabase_anon_key_here
-   # (Optional: add SUPABASE_DB_HOST, SUPABASE_DB_NAME, etc. if using direct Postgres)
    ```
 3. Set up your Supabase table** with columns matching the merged JSON keys.
 
