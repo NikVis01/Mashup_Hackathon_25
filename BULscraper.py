@@ -1,8 +1,7 @@
 import os
 import openai
 import json
-from playwright.sync_api import sync_playwright
-import time
+from playwright.async_api import async_playwright
 
 class BULScraper:
     def __init__(self, openai_api_key=None, template_path="data2.json"):
@@ -10,22 +9,16 @@ class BULScraper:
         openai.api_key = self.openai_api_key
         self.path = template_path
 
-    def take_screenshot(self, url, screenshot_path="bulli_screenshot.png"):
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            # Set a large viewport height to help capture long pages
-            page = browser.new_page(viewport={"width": 1920, "height": 3000})
-            page.goto(url, timeout=60000)
-            time.sleep(2)  # Wait for JS to render
-            # Scroll to the bottom to trigger lazy loading
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            time.sleep(2)  # Wait for any lazy-loaded content
-            # Optionally, scroll back to top for completeness
-            page.evaluate("window.scrollTo(0, 0)")
-            # Take the full page screenshot
-            page.screenshot(path=screenshot_path, full_page=True)
-            browser.close()
-        return screenshot_path
+    async def take_screenshot(self, url):  # Make this method async
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page()
+            await page.goto(url)
+            await page.wait_for_timeout(5000)
+            screenshot_path = "screenshot.png"
+            await page.screenshot(path=screenshot_path)
+            await browser.close()
+            return screenshot_path
 
     def ask_gpt4o_with_image(self, image_path, json_template):
         prompt = f"""
