@@ -1,8 +1,7 @@
 import os
 import openai
 import json
-from playwright.async_api import async_playwright  # Change this line
-import time
+from playwright.async_api import async_playwright
 
 class BULScraper:
     def __init__(self, openai_api_key=None, template_path="data2.json"):
