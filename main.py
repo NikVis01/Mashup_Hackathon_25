@@ -2,12 +2,29 @@ from fastapi import FastAPI, BackgroundTasks
 from NAVscraper import NAVScraper
 from BULscraper import BULScraper
 from db_utils import upsert_bullz_row
+from pydantic import BaseModel, HttpUrl
 import json
 import re
 import time
 from typing import Dict
 
-app = FastAPI()
+app = FastAPI(
+    title="Bull Scraper API",
+    description="An API for scraping bull information from NAV and Bulli websites",
+    version="1.0.0"
+)
+
+class ScrapeRequest(BaseModel):
+    nav_url: HttpUrl = "https://nordic.mloy.fi/NAVBull/BULL/HOLNLDM000671889948/HOL"
+    bulli_url: HttpUrl = "https://bulli.vit.de/home/details/528000671889948"
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "nav_url": "https://nordic.mloy.fi/NAVBull/BULL/HOLNLDM000671889948/HOL",
+                "bulli_url": "https://bulli.vit.de/home/details/528000671889948"
+            }
+        }
 
 def extract_json_from_response(response):
     # Remove markdown code block if present
@@ -60,15 +77,28 @@ async def scrape_and_store_data(nav_url: str, bulli_url: str):
 async def root():
     return {"message": "Welcome to the Bull Scraper API"}
 
-@app.post("/scrape/")
-async def scrape_data(background_tasks: BackgroundTasks):
-    nav_url = "https://nordic.mloy.fi/NAVBull/BULL/HOLNLDM000671889948/HOL"
-    bulli_url = "https://bulli.vit.de/home/details/528000671889948"
+@app.post("/scrape/", 
+    response_model=Dict[str, str],
+    summary="Scrape bull information",
+    description="""
+    Scrapes bull information from both NAV and Bulli websites.
+    The scraping process runs in the background and stores the results in the database.
     
+    - NAV website provides general bull information and traits
+    - Bulli website provides additional details and images
+    """)
+async def scrape_data(
+    request: ScrapeRequest,
+    background_tasks: BackgroundTasks
+):
     # Add the scraping task to background tasks
-    background_tasks.add_task(scrape_and_store_data, nav_url, bulli_url)
+    background_tasks.add_task(scrape_and_store_data, str(request.nav_url), str(request.bulli_url))
     
-    return {"message": "Scraping task has been started"}
+    return {
+        "message": "Scraping task has been started",
+        "nav_url": str(request.nav_url),
+        "bulli_url": str(request.bulli_url)
+    }
 
 @app.get("/status")
 async def get_status():
