@@ -10,7 +10,7 @@ def extract_json_from_response(response):
     match = re.search(r'```(?:json)?\\n(.*?)```', response, re.DOTALL)
     if match:
         return match.group(1).strip()
-    # Try also with just triple backticks (no newline)
+    # Trying also with just triple backticks (no newline)
     match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response, re.DOTALL)
     if match:
         return match.group(1).strip()
@@ -29,10 +29,9 @@ if __name__ == "__main__":
     try:
         nav_result_dict = json.loads(cleaned_nav_result)
         print("NAV Result Dictionary:", nav_result_dict)
-        upsert_bullz_row(nav_result_dict)
     except Exception as e:
         print("Error parsing NAV JSON:", e)
-    
+        nav_result_dict = {}
     
     # Bulli page (screenshot + vision)
     bulli_url = "https://bulli.vit.de/home/details/528000671889948"
@@ -41,15 +40,20 @@ if __name__ == "__main__":
     screenshot_path = bulli_scraper.take_screenshot(bulli_url)
     bulli_json_template = bulli_scraper.load_json_template()
     bulli_result = bulli_scraper.ask_gpt4o_with_image(screenshot_path, bulli_json_template)
-
-    # If the LLM returns markdown, clean it
     cleaned_bulli_result = extract_json_from_response(bulli_result)
-
     try:
         bulli_result_dict = json.loads(cleaned_bulli_result)
         print("Bulli Result Dictionary:", bulli_result_dict)
-        upsert_bullz_row(bulli_result_dict)
     except Exception as e:
         print("Error parsing Bulli JSON:", e)
+        bulli_result_dict = {}
 
+    # Changing 'aAa' to 'aaa' due to postgres column name constraints
+    if 'aAa' in bulli_result_dict:
+        bulli_result_dict['aaa'] = bulli_result_dict.pop('aAa')
+
+    # MERGING DICTIONARIES
+    merged_result = {**nav_result_dict, **bulli_result_dict}
+    print("Merged Result Dictionary:", merged_result)
+    upsert_bullz_row(merged_result)
     

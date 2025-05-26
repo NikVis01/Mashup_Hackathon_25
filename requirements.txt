@@ -1,2 +1,7 @@
 scrapegraphai
-python-dotenv 
+python-dotenv
+openai
+playwright
+beautifulsoup4
+requests
+psycopg2-binary 

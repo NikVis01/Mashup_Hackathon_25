@@ -13,13 +13,16 @@ class BULScraper:
     def take_screenshot(self, url, screenshot_path="bulli_screenshot.png"):
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+            # Set a large viewport height to help capture long pages
+            page = browser.new_page(viewport={"width": 1920, "height": 3000})
             page.goto(url, timeout=60000)
-            # Optionally wait for a key selector or just a bit for JS to render
-            time.sleep(2)
+            time.sleep(2)  # Wait for JS to render
             # Scroll to the bottom to trigger lazy loading
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             time.sleep(2)  # Wait for any lazy-loaded content
+            # Optionally, scroll back to top for completeness
+            page.evaluate("window.scrollTo(0, 0)")
+            # Take the full page screenshot
             page.screenshot(path=screenshot_path, full_page=True)
             browser.close()
         return screenshot_path
@@ -27,7 +30,7 @@ class BULScraper:
     def ask_gpt4o_with_image(self, image_path, json_template):
         prompt = f"""
 You are an information extraction assistant. Extract the following fields from the attached screenshot of a bull's profile page. Respond ONLY with a valid JSON object in this format (fill in the values, leave as null if not found):
-
+Be as specific as possible and try to fill all specified fields as well as you can.
 {json.dumps(json_template, indent=2)}
 """
         with open(image_path, "rb") as img_file:

@@ -1,5 +1,23 @@
 {
-  "name": "Andy Red",
+  "g_rzg": null,
+  "g_rzm": null,
+  "g_rze": null,
+  "g_rzn": null,
+  "g_rzr": null,
+  "fat_percentage": null,
+  "fat_kg": null,
+  "protein_percentage": null,
+  "protein_kg": null,
+  "milk_kg": null,
+  "body_condition": null,
+  "persistency": null,
+  "aAa": null,
+  "cappa_casein": null,
+  "beta_casein": null,
+  "rz_health": null,
+  "daughters": null,
+  "farms": null,
+  "stature": null,
   "rib_structure": null,
   "body_depth": null,
   "rump_angle": null,
@@ -16,5 +34,6 @@
   "fore_udder_attachment": null,
   "udder_balance": null,
   "udder_depth": null,
-  "teat_length": null
+  "teat_length": null,
+  "temperament": null
   }
