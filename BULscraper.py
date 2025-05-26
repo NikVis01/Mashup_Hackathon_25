@@ -2,6 +2,8 @@ import os
 import openai
 import json
 from playwright.async_api import async_playwright
+import asyncio
+import os
 
 class BULScraper:
     def __init__(self, openai_api_key=None, template_path="data2.json"):
@@ -11,19 +13,28 @@ class BULScraper:
 
     async def take_screenshot(self, url):  # Make this method async
         async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            page = await browser.new_page()
+
+            browser = await p.chromium.launch(headless=True)
+
+            # Set a large viewport height to help capture long pages
+            page = await browser.new_page(viewport={"width": 1920, "height": 3000})
             await page.goto(url)
-            await page.wait_for_timeout(5000)
+            await asyncio.sleep(6)  # Wait for JS to render
+            # Scroll to the bottom to trigger lazy loading
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await asyncio.sleep(2)  # Wait for any lazy-loaded content
+            # Optionally, scroll back to top for completeness
+            await page.evaluate("window.scrollTo(0, 0)")
+            # Take the full page screenshot
             screenshot_path = "screenshot.png"
-            await page.screenshot(path=screenshot_path)
+            await page.screenshot(path=screenshot_path, full_page=True)
             await browser.close()
             return screenshot_path
 
     def ask_gpt4o_with_image(self, image_path, json_template):
         prompt = f"""
 You are an information extraction assistant. Extract the following fields from the attached screenshot of a bull's profile page. Respond ONLY with a valid JSON object in this format (fill in the values, leave as null if not found):
-Be as specific as possible and try to fill all specified fields as well as you can.
+Be as specific as possible and try to fill all specified fields as well as you can. Never return percentage signs or other symbols.
 {json.dumps(json_template, indent=2)}
 """
         with open(image_path, "rb") as img_file:
@@ -49,9 +60,10 @@ Be as specific as possible and try to fill all specified fields as well as you c
             return json.load(f)
 
 if __name__ == "__main__":
+    import asyncio
     url = "https://bulli.vit.de/home/details/528000671889948"
     scraper = BULScraper()
-    screenshot_path = scraper.take_screenshot(url)
+    screenshot_path = asyncio.run(scraper.take_screenshot(url))
     json_template = scraper.load_json_template()
     result = scraper.ask_gpt4o_with_image(screenshot_path, json_template)
     print(result)

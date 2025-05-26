@@ -7,6 +7,7 @@ import json
 import re
 import time
 from typing import Dict
+import traceback
 
 app = FastAPI(
     title="Bull Scraper API",
@@ -26,6 +27,13 @@ class ScrapeRequest(BaseModel):
             }
         }
 
+# List of all expected columns (union of both templates)
+def get_expected_columns():
+    with open("data.json") as f1, open("data2.json") as f2:
+        nav_cols = set(json.load(f1).keys())
+        bulli_cols = set(json.load(f2).keys())
+    return sorted(nav_cols | bulli_cols)
+
 def extract_json_from_response(response):
     # Remove markdown code block if present
     match = re.search(r'```(?:json)?\\n(.*?)```', response, re.DOTALL)
@@ -37,31 +45,59 @@ def extract_json_from_response(response):
         return match.group(1).strip()
     return response.strip()
 
+def create_update_comment(merged_result, expected_cols):
+    found_cols = set(merged_result.keys())
+    missing_cols = [col for col in expected_cols if col not in found_cols]
+    update_comment = ""
+    if missing_cols:
+        update_comment += "The following columns are missing in the merged result: " + ", ".join(missing_cols) + ". "
+    else:
+        update_comment += "All expected columns are present in the merged result. "
+    null_cols = [col for col in expected_cols if merged_result.get(col) is None]
+    if null_cols:
+        update_comment += f"Columns {', '.join(null_cols)} contain null values."
+    else:
+        update_comment += "No columns contain null values."
+    return update_comment
+
 async def scrape_and_store_data(nav_url: str, bulli_url: str):
+    print(f"[LOG] Starting scrape_and_store_data for NAV: {nav_url}, Bulli: {bulli_url}")
     # NAV page
     nav_scraper = NAVScraper(template_path="data.json")
+    print("[LOG] Fetching NAV HTML...")
     nav_html = nav_scraper.fetch_html(nav_url)
+    print("[LOG] Extracting NAV content...")
     nav_content = nav_scraper.extract_content(nav_html)
+    print("[LOG] Loading NAV JSON template...")
     nav_json_template = nav_scraper.load_json_template()
+    print("[LOG] Asking GPT-4o for NAV data...")
     nav_result = nav_scraper.ask_gpt4o(nav_content, nav_json_template)
     cleaned_nav_result = extract_json_from_response(nav_result)
     try:
+        print("[LOG] Parsing NAV JSON result...")
         nav_result_dict = json.loads(cleaned_nav_result)
     except Exception as e:
         print("Error parsing NAV JSON:", e)
+        traceback.print_exc()
         nav_result_dict = {}
     
     # Bulli page (screenshot + vision)
     bulli_scraper = BULScraper(template_path="data2.json")
+    print("[LOG] Sleeping 5 seconds before Bulli scrape...")
     time.sleep(5)
+    print("[LOG] Taking Bulli screenshot...")
     screenshot_path = await bulli_scraper.take_screenshot(bulli_url)  # Add await here
+    print(f"[LOG] Screenshot saved to {screenshot_path}")
     bulli_json_template = bulli_scraper.load_json_template()
+    print("[LOG] Asking GPT-4o with Bulli image...")
     bulli_result = bulli_scraper.ask_gpt4o_with_image(screenshot_path, bulli_json_template)
     cleaned_bulli_result = extract_json_from_response(bulli_result)
     try:
+        print("[LOG] Parsing Bulli JSON result...")
         bulli_result_dict = json.loads(cleaned_bulli_result)
     except Exception as e:
         print("Error parsing Bulli JSON:", e)
+        traceback.print_exc()
         bulli_result_dict = {}
 
     # Changing 'aAa' to 'aaa' due to postgres column name constraints
@@ -69,8 +105,14 @@ async def scrape_and_store_data(nav_url: str, bulli_url: str):
         bulli_result_dict['aaa'] = bulli_result_dict.pop('aAa')
 
     # MERGING DICTIONARIES
+    print("[LOG] Merging NAV and Bulli results...")
     merged_result = {**nav_result_dict, **bulli_result_dict}
+    # Create and append update_comment
+    print("[LOG] Creating update_comment...")
+    merged_result["update_comment"] = create_update_comment(merged_result, get_expected_columns())
+    print("[LOG] Upserting merged result to Supabase...")
     upsert_bullz_row(merged_result)
+    print("[LOG] Upsert complete. Returning merged result.")
     return merged_result
 
 @app.get("/")

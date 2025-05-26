@@ -10,6 +10,7 @@ load_dotenv()
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY")
 
+### Main upsert function for Bullz table ###
 def upsert_bullz_row(data):
     url = f"{SUPABASE_URL}/rest/v1/Bullz"
     headers = {
@@ -35,5 +36,3 @@ if __name__ == "__main__":
         # Add any other columns you want to set/update
     }
     upsert_bullz_row(data)
-
-
