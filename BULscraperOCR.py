@@ -90,6 +90,8 @@ OCR Extracted Text:
 JSON Template:
 {json.dumps(json_template, indent=2)}
 
+Do not wrap JSON in ```json
+
 Be as specific as possible and try to fill all specified fields as well as you can. 
 Never return percentage signs or other symbols.
 If there's a conflict between OCR text and what you see in the image, trust the image.
@@ -112,6 +114,7 @@ If there's a conflict between OCR text and what you see in the image, trust the 
             max_tokens=1500
         )
         result_json = response.choices[0].message.content
+        print("GPT-4o Response JSON:", result_json)
         result_dict = json.loads(result_json)
 
         # Now result_dict["chest_width"] is just the number as a string
