@@ -11,6 +11,9 @@ import traceback
 import datetime
 import asyncio
 
+import psycopg2  # Ensure psycopg2 is installed for database operations
+from psycopg2 import errorcodes, DatabaseError
+
 app = FastAPI(
     title="Bull Scraper API",
     description="An API for scraping bull information from NAV and Bulli websites",
