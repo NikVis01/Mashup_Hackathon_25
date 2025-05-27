@@ -1,5 +1,8 @@
 # Bull Data Scraper & Uploader
 
+### 📊 Bull Reports
+With all bull data stored in a structured, type-safe format in Supabase, you can easily generate rich, data-driven bull reports for breeding, analytics, or presentation—directly from your database.
+
 ## Environment Setup
 
 1. **Install dependencies**:
