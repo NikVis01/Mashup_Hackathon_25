@@ -93,6 +93,7 @@ async def scrape_and_store_data(nav_url: str, bulli_url: str):
     print("[LOG] Asking GPT-4o for NAV data...")
     nav_result = nav_scraper.ask_gpt4o(nav_content, nav_json_template)
     cleaned_nav_result = extract_json_from_response(nav_result)
+    print("[DEBUG] Cleaned NAV result:", cleaned_nav_result)
     try:
         print("[LOG] Parsing NAV JSON result...")
         nav_result_dict = json.loads(cleaned_nav_result)
@@ -129,6 +130,9 @@ async def scrape_and_store_data(nav_url: str, bulli_url: str):
     # MERGING DICTIONARIES
     print("[LOG] Merging NAV and Bulli results...")
     merged_result = {**nav_result_dict, **bulli_result_dict}
+
+    print("[DEBUG] Merged result:", merged_result)
+
     # Create and append update_comment
     print("[LOG] Creating update_comment...")
     merged_result["update_comment"] = create_update_comment(merged_result, get_expected_columns())

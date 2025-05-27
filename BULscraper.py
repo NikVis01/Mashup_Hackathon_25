@@ -1,67 +1,69 @@
-import asyncio
+import os
+import openai
+import json
 from playwright.async_api import async_playwright
-from bs4 import BeautifulSoup
-import csv
+import asyncio
+import os
 
-async def scrape_bull_details_links_with_search(start_url, output_csv="bull_details_links.csv"):
-    all_links = []
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto(start_url)
+class BULScraper:
+    def __init__(self, openai_api_key=None, template_path="data2.json"):
+        self.openai_api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
+        openai.api_key = self.openai_api_key
+        self.path = template_path
 
-        # --- 1. Fill in the search bar(s) ---
-        # Adjust these selectors to match your page!
-        await page.fill('input[placeholder="Breed"]', "Holstein")
-        await page.fill('input[placeholder="Country"]', "all")
-        # --- 2. Click the search button ---
-        await page.click('button:has-text("Search")')
-        await page.wait_for_timeout(2000)  # Wait for results to load
+    async def take_screenshot(self, url):  # Make this method async
+        async with async_playwright() as p:
 
-        # --- 3. Infinite scroll to load all bulls ---
-        last_height = 0
-        same_height_count = 0
-        print("Scrolling to load all bulls...")
-        while True:
+            browser = await p.chromium.launch(headless=True)
+
+            # Set a large viewport height to help capture long pages
+            page = await browser.new_page(viewport={"width": 1920, "height": 3000})
+            await page.goto(url)
+            await asyncio.sleep(5)  # Wait for JS to render
+            # Scroll to the bottom to trigger lazy loading
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(1500)
-            new_height = await page.evaluate("document.body.scrollHeight")
-            if new_height == last_height:
-                same_height_count += 1
-                if same_height_count > 2:
-                    break
-            else:
-                same_height_count = 0
-                last_height = new_height
+            await asyncio.sleep(2)  # Wait for any lazy-loaded content
+            # Optionally, scroll back to top for completeness
+            await page.evaluate("window.scrollTo(0, 0)")
+            # Take the full page screenshot
+            screenshot_path = "screenshot.png"
+            await page.screenshot(path=screenshot_path, full_page=True)
+            await browser.close()
+            return screenshot_path
 
-        # --- 4. Parse and extract links ---
-        print("Parsing loaded HTML...")
-        html = await page.content()
-        soup = BeautifulSoup(html, "html.parser")
-        # Adjust selector for bull cards
-        for card in soup.find_all("mat-expansion-panel-header"):
-            # Extract bull name
-            name_tag = card.find("span", class_="mat-content")
-            bull_name = name_tag.text.strip() if name_tag else "Unknown"
-            # Find the corresponding details button
-            details_btn = card.find_next("button", string="Details")
-            details_link = None
-            if details_btn and details_btn.has_attr("ng-reflect-router-link"):
-                details_link = details_btn["ng-reflect-router-link"]
-            all_links.append({"name": bull_name, "url": details_link})
+    def ask_gpt4o_with_image(self, image_path, json_template):
+        prompt = f"""
+You are an information extraction assistant. Extract the following fields from the attached screenshot of a bull's profile page. Respond ONLY with a valid JSON object in this format (fill in the values, leave as null if not found):
+Be as specific as possible and try to fill all specified fields as well as you can. Never return percentage signs or other symbols.
+{json.dumps(json_template, indent=2)}
+"""
+        with open(image_path, "rb") as img_file:
+            image_data = img_file.read()
+        # OpenAI Vision API expects base64-encoded image URLs
+        import base64
+        image_b64 = base64.b64encode(image_data).decode("utf-8")
+        image_url = f"data:image/png;base64,{image_b64}"
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "user", "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": image_url}}
+                ]}
+            ],
+            max_tokens=1500
+        )
+        return response.choices[0].message.content
 
-        await browser.close()
+    def load_json_template(self):
+        with open(self.path, "r") as f:
+            return json.load(f)
 
-    # --- 5. Write to CSV ---
-    if all_links:
-        with open(output_csv, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=["name", "url"])
-            writer.writeheader()
-            for link in all_links:
-                writer.writerow(link)
-        print(f"Extracted {len(all_links)} bull details links to {output_csv}")
-    else:
-        print("No links found! Check your selectors and page structure.")
-
-# To run:
-# asyncio.run(scrape_bull_details_links_with_search('YOUR_URL_HERE'))
+if __name__ == "__main__":
+    import asyncio
+    url = "https://bulli.vit.de/home/details/528000671889948"
+    scraper = BULScraper()
+    screenshot_path = asyncio.run(scraper.take_screenshot(url))
+    json_template = scraper.load_json_template()
+    result = scraper.ask_gpt4o_with_image(screenshot_path, json_template)
+    print(result)
