@@ -8,7 +8,10 @@ import re
 import time
 from typing import Dict
 import traceback
-import datetime
+import os
+
+import psycopg2
+from psycopg2 import errorcodes, DatabaseError
 
 app = FastAPI(
     title="Bull Scraper API",
@@ -127,6 +130,10 @@ async def scrape_and_store_data(nav_url: str, bulli_url: str):
     if 'aAa' in bulli_result_dict:
         bulli_result_dict['aaa'] = bulli_result_dict.pop('aAa')
 
+    # Changing 'aAa' to 'aaa' due to postgres column name constraints
+    if 'BCS_gM' in bulli_result_dict:
+        bulli_result_dict['body_condition'] = bulli_result_dict.pop('BCS_gM')
+
     # MERGING DICTIONARIES
     print("[LOG] Merging NAV and Bulli results...")
     merged_result = {**nav_result_dict, **bulli_result_dict}
@@ -135,12 +142,18 @@ async def scrape_and_store_data(nav_url: str, bulli_url: str):
 
     # Create and append update_comment
     print("[LOG] Creating update_comment...")
-    merged_result["update_comment"] = create_update_comment(merged_result, get_expected_columns())
-    merged_result["last_update_finished"] = datetime.datetime.utcnow().isoformat()
-    print("[LOG] Upserting merged result to Supabase...")
-    print(merged_result)
-    upsert_bullz_row(merged_result)
-    print("[LOG] Upsert complete. Returning merged result.")
+    try:
+        merged_result["update_comment"] = create_update_comment(merged_result, get_expected_columns())
+        print("[LOG] Upserting merged result to Supabase...")
+        upsert_bullz_row(merged_result)
+        print("[LOG] Upsert complete. Returning merged result.")
+
+    except psycopg2.Error as e:
+        print("TypeError detected when upserting:", e)
+        error_msg = "Unsuccessful upsert: TypeError"
+        error_dict = {"update_message": error_msg}
+        upsert_bullz_row(error_dict)
+        print("[LOG] Error upserting error message:", e)
     return merged_result
 
 @app.get("/")
@@ -177,16 +190,4 @@ async def get_status():
 
 if __name__ == "__main__":
     import uvicorn
-    import multiprocessing
-    
-    # Use multiprocessing to avoid conflicts with BeautifulSoup
-    multiprocessing.freeze_support()
-    
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        reload_excludes=["__pycache__/*", "*.pyc"],
-        workers=1
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8000)
