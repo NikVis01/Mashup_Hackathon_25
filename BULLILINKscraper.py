@@ -3,24 +3,15 @@ from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 import csv
 
-async def scrape_bull_details_links_with_search(start_url, output_csv="bull_details_links.csv"):
+async def scrape_bull_details_links(start_url, output_csv="bull_details_links.csv"):
     all_links = []
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         await page.goto(start_url)
-
-        # --- 1. Fill in the search bar(s) ---
-        # Adjust these selectors to match your page!
-        await page.fill('input[placeholder="Breed"]', "Holstein")
-        await page.fill('input[placeholder="Country"]', "all")
-        # --- 2. Click the search button ---
-        await page.click('button:has-text("Search")')
-        await page.wait_for_timeout(2000)  # Wait for results to load
-
-        # --- 3. Infinite scroll to load all bulls ---
         last_height = 0
         same_height_count = 0
+
         print("Scrolling to load all bulls...")
         while True:
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -34,17 +25,17 @@ async def scrape_bull_details_links_with_search(start_url, output_csv="bull_deta
                 same_height_count = 0
                 last_height = new_height
 
-        # --- 4. Parse and extract links ---
         print("Parsing loaded HTML...")
         html = await page.content()
         soup = BeautifulSoup(html, "html.parser")
-        # Adjust selector for bull cards
-        for card in soup.find_all("mat-expansion-panel-header"):
-            # Extract bull name
-            name_tag = card.find("span", class_="mat-content")
+
+        cards = soup.find_all("mat-card")  # Adjust this selector!
+        print(f"Found {len(cards)} cards.")
+        for card in cards:
+            # Adjust selectors as needed!
+            name_tag = card.find("div", class_="mat-card-title")
             bull_name = name_tag.text.strip() if name_tag else "Unknown"
-            # Find the corresponding details button
-            details_btn = card.find_next("button", string="Details")
+            details_btn = card.find("button", string="Details")
             details_link = None
             if details_btn and details_btn.has_attr("ng-reflect-router-link"):
                 details_link = details_btn["ng-reflect-router-link"]
@@ -52,7 +43,6 @@ async def scrape_bull_details_links_with_search(start_url, output_csv="bull_deta
 
         await browser.close()
 
-    # --- 5. Write to CSV ---
     if all_links:
         with open(output_csv, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=["name", "url"])
@@ -64,4 +54,4 @@ async def scrape_bull_details_links_with_search(start_url, output_csv="bull_deta
         print("No links found! Check your selectors and page structure.")
 
 # To run:
-# asyncio.run(scrape_bull_details_links_with_search('YOUR_URL_HERE'))
+asyncio.run(scrape_bull_details_links('https://bulli.vit.de/home'))
