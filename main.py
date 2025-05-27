@@ -8,7 +8,7 @@ import re
 import time
 from typing import Dict
 import traceback
-import os
+import datetime
 
 app = FastAPI(
     title="Bull Scraper API",
@@ -136,7 +136,9 @@ async def scrape_and_store_data(nav_url: str, bulli_url: str):
     # Create and append update_comment
     print("[LOG] Creating update_comment...")
     merged_result["update_comment"] = create_update_comment(merged_result, get_expected_columns())
+    merged_result["last_update_finished"] = datetime.datetime.utcnow().isoformat()
     print("[LOG] Upserting merged result to Supabase...")
+    print(merged_result)
     upsert_bullz_row(merged_result)
     print("[LOG] Upsert complete. Returning merged result.")
     return merged_result
@@ -175,4 +177,16 @@ async def get_status():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import multiprocessing
+    
+    # Use multiprocessing to avoid conflicts with BeautifulSoup
+    multiprocessing.freeze_support()
+    
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        reload_excludes=["__pycache__/*", "*.pyc"],
+        workers=1
+    )

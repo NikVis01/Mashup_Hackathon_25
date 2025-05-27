@@ -17,10 +17,17 @@ def upsert_bullz_row(data):
         "apikey": SUPABASE_ANON_KEY,
         "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates,return=representation"
+        "Prefer": "return=representation"
     }
-    # Supabase expects a list of dicts for upsert
-    response = requests.post(url, headers=headers, json=[data])
+    
+    # First try to update existing record
+    update_url = f"{url}?name=eq.{data['name']}"
+    response = requests.patch(update_url, headers=headers, json=data)
+    
+    # If no rows were updated (response is empty), then insert
+    if not response.content.strip():
+        response = requests.post(url, headers=headers, json=data)
+    
     print("Status:", response.status_code)
     try:
         print("Response:", response.json())
