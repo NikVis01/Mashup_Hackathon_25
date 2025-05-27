@@ -7,15 +7,17 @@ from paddleocr import PaddleOCR
 import urllib.request
 import tarfile
 import requests
+import re
 
 
 OCR_KEY=os.environ.get("OCR_KEY")
 
-class BULScraper:
+class BULScraperOCR:
     def __init__(self, openai_api_key=None, template_path="data2.json"):
         self.openai_api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
         openai.api_key = self.openai_api_key
-        self.ocr_key = os.environ.get('OCR_API_KEY')
+        #self.ocr_key = os.environ.get('OCR_API_KEY')
+        self.ocr_key = 'K88521408988957'
         self.path = template_path
 
     async def take_screenshot(self, url):  # Make this method async
@@ -37,16 +39,37 @@ class BULScraper:
             return screenshot_path
 
     def extract_text_with_ocr(self, image_path):
-        payload = {'isOverlayRequired': False,
-                    'apikey': self.ocr_key,
-                    'language': "end",
-                    }
+        payload = {
+            'isOverlayRequired': False,
+            'apikey': self.ocr_key,
+            'language': "eng",
+        }
         with open(image_path, 'rb') as f:
-            r = requests.post('https://api.ocr.space/parse/image',
-                            files={image_path: f},
-                            data=payload,
-                            )
-        return r.content.decode()
+            r = requests.post(
+                'https://api.ocr.space/parse/image',
+                files={image_path: f},
+                data=payload,
+            )
+        output = r.content.decode()
+        print("Raw OCR API output:", output)
+        try:
+            result = json.loads(output)
+            # Check for expected structure
+            if (
+                "ParsedResults" in result and
+                isinstance(result["ParsedResults"], list) and
+                len(result["ParsedResults"]) > 0 and
+                "ParsedText" in result["ParsedResults"][0]
+            ):
+                text = result["ParsedResults"][0]["ParsedText"]
+                print("Extracted OCR text:", text)
+                return text
+            else:
+                print("OCR API did not return expected structure.")
+                return ""
+        except Exception as e:
+            print("Error parsing OCR API response:", e)
+            return ""
 
     def ask_gpt4o_with_image(self, image_path, json_template):
         # First, extract text using OCR
@@ -57,7 +80,7 @@ You are an information extraction assistant. I will provide you with:
 1. OCR-extracted text from the image
 2. The actual image
 
-Extract the following fields from both the OCR text and the image of a bull's profile page. 
+Extract the following fields from both the OCR text and the image of a bull's profile page, weighing the OCR higher. 
 The OCR text may contain some errors, so use the image to verify and correct any mistakes.
 Respond ONLY with a valid JSON object in this format (fill in the values, leave as null if not found):
 
@@ -88,7 +111,11 @@ If there's a conflict between OCR text and what you see in the image, trust the 
             ],
             max_tokens=1500
         )
-        return response.choices[0].message.content
+        result_json = response.choices[0].message.content
+        result_dict = json.loads(result_json)
+
+        # Now result_dict["chest_width"] is just the number as a string
+        return json.dumps(result_dict)
 
     def load_json_template(self):
         with open(self.path, "r") as f:
@@ -97,7 +124,7 @@ If there's a conflict between OCR text and what you see in the image, trust the 
 if __name__ == "__main__":
     import asyncio
     url = "https://bulli.vit.de/home/details/528000671889948"
-    scraper = BULScraper()
+    scraper = BULScraperOCR()
     screenshot_path = asyncio.run(scraper.take_screenshot(url))
     json_template = scraper.load_json_template()
     result = scraper.ask_gpt4o_with_image(screenshot_path, json_template)

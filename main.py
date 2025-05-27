@@ -1,6 +1,6 @@
 from fastapi import FastAPI, BackgroundTasks
 from NAVscraper import NAVScraper
-from BULscraper import BULScraper
+from BULscraperOCR import BULScraperOCR
 from db_utils import upsert_bullz_row
 from pydantic import BaseModel, HttpUrl
 import json
@@ -107,7 +107,7 @@ async def scrape_and_store_data(nav_url: str, bulli_url: str):
         nav_result_dict = {}
     
     # Bulli page (screenshot + vision)
-    bulli_scraper = BULScraper(template_path="data2.json")
+    bulli_scraper = BULScraperOCR(template_path="data2.json")
     print("[LOG] Sleeping 5 seconds before Bulli scrape...")
     time.sleep(5)
     print("[LOG] Taking Bulli screenshot...")
