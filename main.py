@@ -8,6 +8,7 @@ import re
 import time
 from typing import Dict
 import traceback
+import os
 
 app = FastAPI(
     title="Bull Scraper API",
