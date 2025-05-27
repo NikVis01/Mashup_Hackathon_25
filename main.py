@@ -8,10 +8,8 @@ import re
 import time
 from typing import Dict
 import traceback
-import os
-
-import psycopg2
-from psycopg2 import errorcodes, DatabaseError
+import datetime
+import asyncio
 
 app = FastAPI(
     title="Bull Scraper API",
@@ -174,8 +172,13 @@ async def scrape_data(
     request: ScrapeRequest,
     background_tasks: BackgroundTasks
 ):
-    # Add the scraping task to background tasks
-    background_tasks.add_task(scrape_and_store_data, str(request.nav_url), str(request.bulli_url))
+    # Add the scraping task to background tasks with a delay to allow batching
+    # Sleep for 2 seconds to allow other requests to come in before processing starts
+    async def delayed_scrape():
+        await asyncio.sleep(2)
+        await scrape_and_store_data(str(request.nav_url), str(request.bulli_url))
+    
+    background_tasks.add_task(delayed_scrape)
     
     return {
         "message": "Scraping task has been started",
@@ -190,4 +193,16 @@ async def get_status():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import multiprocessing
+    
+    workers = multiprocessing.cpu_count() - 1
+    
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        workers=workers,
+        limit_concurrency=100,  # Increase concurrent connection limit
+        backlog=100  # Increase connection queue size
+    )
