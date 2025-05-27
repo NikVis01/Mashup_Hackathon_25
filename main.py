@@ -9,6 +9,7 @@ import time
 from typing import Dict
 import traceback
 import datetime
+import asyncio
 
 app = FastAPI(
     title="Bull Scraper API",
@@ -161,8 +162,13 @@ async def scrape_data(
     request: ScrapeRequest,
     background_tasks: BackgroundTasks
 ):
-    # Add the scraping task to background tasks
-    background_tasks.add_task(scrape_and_store_data, str(request.nav_url), str(request.bulli_url))
+    # Add the scraping task to background tasks with a delay to allow batching
+    # Sleep for 2 seconds to allow other requests to come in before processing starts
+    async def delayed_scrape():
+        await asyncio.sleep(2)
+        await scrape_and_store_data(str(request.nav_url), str(request.bulli_url))
+    
+    background_tasks.add_task(delayed_scrape)
     
     return {
         "message": "Scraping task has been started",
@@ -179,14 +185,14 @@ if __name__ == "__main__":
     import uvicorn
     import multiprocessing
     
-    # Use multiprocessing to avoid conflicts with BeautifulSoup
-    multiprocessing.freeze_support()
+    workers = multiprocessing.cpu_count() - 1
     
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8000,
         reload=True,
-        reload_excludes=["__pycache__/*", "*.pyc"],
-        workers=1
+        workers=workers,
+        limit_concurrency=100,  # Increase concurrent connection limit
+        backlog=100  # Increase connection queue size
     )
