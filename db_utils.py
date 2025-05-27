@@ -12,7 +12,7 @@ SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY")
 
 ### Main upsert function for Bullz table ###
 def upsert_bullz_row(data):
-    url = f"{SUPABASE_URL}/rest/v1/Bullz"
+    url = f"{SUPABASE_URL}/rest/v1/bulls"
     headers = {
         "apikey": SUPABASE_ANON_KEY,
         "Authorization": f"Bearer {SUPABASE_ANON_KEY}",

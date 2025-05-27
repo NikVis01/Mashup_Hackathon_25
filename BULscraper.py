@@ -19,7 +19,7 @@ class BULScraper:
             # Set a large viewport height to help capture long pages
             page = await browser.new_page(viewport={"width": 1920, "height": 3000})
             await page.goto(url)
-            await asyncio.sleep(6)  # Wait for JS to render
+            await asyncio.sleep(10)  # Wait for JS to render
             # Scroll to the bottom to trigger lazy loading
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await asyncio.sleep(2)  # Wait for any lazy-loaded content

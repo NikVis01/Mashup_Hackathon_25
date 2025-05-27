@@ -60,6 +60,25 @@ def create_update_comment(merged_result, expected_cols):
         update_comment += "No columns contain null values."
     return update_comment
 
+### NEED STRUCTURED OUTPUT AND TYPE CHECKING FROM GPT ###
+
+# For NAV scraper
+NAV_FIELD_TYPES = {
+    "name": str,
+    "yield": float,
+
+}
+
+# For BUL scraper
+BUL_FIELD_TYPES = {
+    "aAa": str,
+    "cappa_casain": str,
+    "beta_casain": str,
+    "fat_percentage": float,
+    "protein_percentage": float
+    
+}
+
 async def scrape_and_store_data(nav_url: str, bulli_url: str):
     print(f"[LOG] Starting scrape_and_store_data for NAV: {nav_url}, Bulli: {bulli_url}")
     # NAV page
@@ -91,7 +110,9 @@ async def scrape_and_store_data(nav_url: str, bulli_url: str):
     bulli_json_template = bulli_scraper.load_json_template()
     print("[LOG] Asking GPT-4o with Bulli image...")
     bulli_result = bulli_scraper.ask_gpt4o_with_image(screenshot_path, bulli_json_template)
+    print("[DEBUG] Raw Bulli result from OpenAI:", bulli_result)
     cleaned_bulli_result = extract_json_from_response(bulli_result)
+    print("[DEBUG] Cleaned Bulli result:", cleaned_bulli_result)
     try:
         print("[LOG] Parsing Bulli JSON result...")
         bulli_result_dict = json.loads(cleaned_bulli_result)
